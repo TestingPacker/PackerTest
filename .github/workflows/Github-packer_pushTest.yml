@@ -29,7 +29,7 @@ jobs:
         uses: actions/setup-java@v3
         with:
           java-version: "21"
-          distribution: "adopt"
+          distribution: "temurin"
 
       - name: Build with Maven
         env:
@@ -45,16 +45,22 @@ jobs:
         env:
           PACKER_LOG: 1
         run: |
+          # Convert comma-separated list to JSON array
+          AMI_USERS_JSON="[\"$(echo ${{secrets.AMI_USERS}} | sed 's/,/\",\"/g')\"]"
+          
           packer init .
           packer validate -var="aws_region=${{secrets.AWS_REGION}}" \
             -var="subnet_id=${{secrets.SUBNET_ID}}" \
-            -var='ami_users=["${{secrets.AMI_USERS}}"]' \
+            -var="ami_users=$AMI_USERS_JSON" \
             .
           packer build -var="aws_region=${{secrets.AWS_REGION}}" \
             -var="subnet_id=${{secrets.SUBNET_ID}}" \
-            -var='ami_users=["${{secrets.AMI_USERS}}"]' \
+            -var="ami_users=$AMI_USERS_JSON" \
             .
-          AMI_ID=$(aws ec2 describe-images --filters "Name=name,Values=csye6225_*" --query 'sort_by(Images, &CreationDate)[-1].ImageId' --output text)
+          AMI_ID=$(aws ec2 describe-images \
+            --owners "039612889197" "156041419933" \
+            --query 'sort_by(Images, &CreationDate)[-1].ImageId' \
+            --output text)
           echo "AMI_ID=${AMI_ID}" >> $GITHUB_ENV
 
       - name: Verify Build Status
