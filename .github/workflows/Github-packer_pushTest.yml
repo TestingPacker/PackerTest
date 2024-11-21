@@ -40,6 +40,23 @@ jobs:
       - name: Run tests
         run: mvn test
 
+      # - name: Build Packer Image
+      #   working-directory: PKR
+      #   env:
+      #     PACKER_LOG: 1
+      #   run: |
+      #     packer init .
+      #     packer validate -var="aws_region=${{secrets.AWS_REGION}}" \
+      #       -var="subnet_id=${{secrets.SUBNET_ID}}" \
+      #       -var='ami_users=["${{secrets.AMI_USERS}}"]' \
+      #       .
+      #     packer build -var="aws_region=${{secrets.AWS_REGION}}" \
+      #       -var="subnet_id=${{secrets.SUBNET_ID}}" \
+      #       -var='ami_users=["${{secrets.AMI_USERS}}"]' \
+      #       .
+      #     AMI_ID=$(aws ec2 describe-images --filters "Name=name,Values=csye6225_*" --query 'sort_by(Images, &CreationDate)[-1].ImageId' --output text)
+      #     echo "AMI_ID=${AMI_ID}" >> $GITHUB_ENV
+
       - name: Build Packer Image
         working-directory: PKR
         env:
@@ -48,11 +65,11 @@ jobs:
           packer init .
           packer validate -var="aws_region=${{secrets.AWS_REGION}}" \
             -var="subnet_id=${{secrets.SUBNET_ID}}" \
-            -var='ami_users=["${{secrets.AMI_USERS}}"]' \
+            -var="ami_users=${{secrets.AMI_USERS}}" \
             .
           packer build -var="aws_region=${{secrets.AWS_REGION}}" \
             -var="subnet_id=${{secrets.SUBNET_ID}}" \
-            -var='ami_users=["${{secrets.AMI_USERS}}"]' \
+            -var="ami_users=${{secrets.AMI_USERS}}" \
             .
           AMI_ID=$(aws ec2 describe-images --filters "Name=name,Values=csye6225_*" --query 'sort_by(Images, &CreationDate)[-1].ImageId' --output text)
           echo "AMI_ID=${AMI_ID}" >> $GITHUB_ENV
