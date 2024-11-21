@@ -18,8 +18,8 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v2
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-access-key-id: ${{secrets.AWS_ACCESS_KEY_ID}}
+          aws-secret-access-key: ${{secrets.AWS_SECRET_ACCESS_KEY}}
           aws-region: us-east-1
 
       - name: Install Packer
@@ -33,8 +33,8 @@ jobs:
 
       - name: Build with Maven
         env:
-          DB_USERNAME: ${{ secrets.DB_USERNAME }}
-          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          DB_USERNAME: ${{secrets.DB_USERNAME}}
+          DB_PASSWORD: ${{secrets.DB_PASSWORD}}
         run: mvn clean install -DskipTests
 
       - name: Run tests
@@ -46,18 +46,14 @@ jobs:
           PACKER_LOG: 1
         run: |
           packer init .
-          packer validate -var="aws_region=${{ secrets.AWS_REGION }}" \
-            -var="subnet_id=${{ secrets.SUBNET_ID }}" \
-            -var='ami_users=["${{ secrets.AMI_USERS }}"]' \
+          packer validate -var="aws_region=${{secrets.AWS_REGION}}" \
+            -var="subnet_id=${{secrets.SUBNET_ID}}" \
+            -var='ami_users=["${{secrets.AMI_USERS}}"]' \
             .
-          packer build -var="aws_region=${{ secrets.AWS_REGION }}" \
-            -var="subnet_id=${{ secrets.SUBNET_ID }}" \
-            -var='ami_users=["${{ secrets.AMI_USERS }}"]' \
+          packer build -var="aws_region=${{secrets.AWS_REGION}}" \
+            -var="subnet_id=${{secrets.SUBNET_ID}}" \
+            -var='ami_users=["${{secrets.AMI_USERS}}"]' \
             .
-
       - name: Verify Build Status
         if: success()
         run: echo "Packer build completed successfully"
-
-#This is the new packer builder.
-
