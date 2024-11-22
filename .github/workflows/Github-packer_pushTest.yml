@@ -1,4 +1,4 @@
-name: Packer Custom Image Build and Deploy
+name: Packer Custom Image Build and Demo Deploy
 
 on:
   pull_request:
@@ -15,11 +15,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Configure AWS Dev credentials
+      - name: Configure AWS Demo credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{secrets.AWS_ACCESS_KEY_ID}}
-          aws-secret-access-key: ${{secrets.AWS_SECRET_ACCESS_KEY}}
+          aws-access-key-id: ${{secrets.DEMO_AWS_ACCESS_KEY_ID}}
+          aws-secret-access-key: ${{secrets.DEMO_AWS_SECRET_ACCESS_KEY}}
           aws-region: us-east-1
 
       - name: Install Packer
@@ -49,22 +49,22 @@ jobs:
           
           packer init .
           packer validate -var="aws_region=${{secrets.AWS_REGION}}" \
-            -var="subnet_id=${{secrets.SUBNET_ID}}" \
+            -var="subnet_id=${{secrets.DEMO_SUBNET_ID}}" \
             -var="ami_users=$AMI_USERS_JSON" \
             .
           packer build -var="aws_region=${{secrets.AWS_REGION}}" \
-            -var="subnet_id=${{secrets.SUBNET_ID}}" \
+            -var="subnet_id=${{secrets.DEMO_SUBNET_ID}}" \
             -var="ami_users=$AMI_USERS_JSON" \
             .
           AMI_ID=$(aws ec2 describe-images \
-            --owners "039612889197" "156041419933" \
+            --owners "156041419933" \
             --query 'sort_by(Images, &CreationDate)[-1].ImageId' \
             --output text)
           echo "AMI_ID=${AMI_ID}" >> $GITHUB_ENV
 
-      - name: Update Dev Infrastructure
+      - name: Update Demo Infrastructure
         run: |
-          echo "Looking up Dev Launch Template..."
+          echo "Looking up Demo Launch Template..."
           LAUNCH_TEMPLATE_NAME="csye6225_asg_launch_template"
           echo "Searching for template: $LAUNCH_TEMPLATE_NAME"
           
@@ -94,15 +94,8 @@ jobs:
             --output text)
           echo "Created new version: $NEW_VERSION"
           
-          echo "Looking up Dev Auto Scaling Group..."
-          ASG_NAME=$(aws autoscaling describe-auto-scaling-groups \
-            --query 'AutoScalingGroups[?contains(Tags[?Key==`Environment`].Value, `dev`)].AutoScalingGroupName' \
-            --output text)
-          
-          if [ -z "$ASG_NAME" ]; then
-            echo "Error: Failed to find Dev Auto Scaling Group"
-            exit 1
-          fi
+          echo "Looking up Demo Auto Scaling Group..."
+          ASG_NAME="csye6225-asg"
           echo "Found ASG: $ASG_NAME"
           
           echo "Updating Auto Scaling Group with new launch template version..."
@@ -117,7 +110,7 @@ jobs:
             --query 'InstanceRefreshId' \
             --output text)
           
-          echo "Monitoring Dev instance refresh: $REFRESH_ID"
+          echo "Monitoring instance refresh: $REFRESH_ID"
           while true; do
             STATUS=$(aws autoscaling describe-instance-refreshes \
               --auto-scaling-group-name $ASG_NAME \
@@ -125,7 +118,7 @@ jobs:
               --query 'InstanceRefreshes[0].Status' \
               --output text)
             
-            echo "Dev instance refresh status: $STATUS"
+            echo "Instance refresh status: $STATUS"
             if [ "$STATUS" = "Successful" ]; then
               exit 0
             elif [ "$STATUS" = "Failed" ] || [ "$STATUS" = "Cancelled" ]; then
