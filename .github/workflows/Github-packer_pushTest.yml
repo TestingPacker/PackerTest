@@ -15,12 +15,12 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Configure AWS Dev credentials for Packer
+      - name: Configure AWS Dev credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{secrets.AWS_ACCESS_KEY_ID}}
           aws-secret-access-key: ${{secrets.AWS_SECRET_ACCESS_KEY}}
-          aws-region: ${{secrets.AWS_REGION}}
+          aws-region: us-east-1
 
       - name: Install Packer
         uses: hashicorp/setup-packer@v2.0.0
@@ -50,11 +50,11 @@ jobs:
           AMI_USERS_JSON="[\"$(echo ${{secrets.AMI_USERS}} | sed 's/,/\",\"/g')\"]"
           
           packer init .
-          packer validate -var="aws_region=${{secrets.AWS_REGION}}" \
+          packer validate -var="aws_region=us-east-1" \
             -var="subnet_id=${{secrets.SUBNET_ID}}" \
             -var="ami_users=$AMI_USERS_JSON" \
             .
-          packer build -var="aws_region=${{secrets.AWS_REGION}}" \
+          packer build -var="aws_region=us-east-1" \
             -var="subnet_id=${{secrets.SUBNET_ID}}" \
             -var="ami_users=$AMI_USERS_JSON" \
             .
@@ -69,7 +69,7 @@ jobs:
         with:
           aws-access-key-id: ${{secrets.DEMO_AWS_ACCESS_KEY_ID}}
           aws-secret-access-key: ${{secrets.DEMO_AWS_SECRET_ACCESS_KEY}}
-          aws-region: ${{secrets.AWS_REGION}}
+          aws-region: us-east-1
 
       - name: Update Demo Infrastructure
         env:
