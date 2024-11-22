@@ -15,12 +15,12 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Configure AWS Dev credentials for Packer
+      - name: Configure AWS Dev credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{secrets.AWS_ACCESS_KEY_ID}}
           aws-secret-access-key: ${{secrets.AWS_SECRET_ACCESS_KEY}}
-          aws-region: ${{secrets.AWS_REGION}}
+          aws-region: us-east-1
 
       - name: Install Packer
         uses: hashicorp/setup-packer@v2.0.0
@@ -44,8 +44,6 @@ jobs:
         working-directory: PKR
         env:
           PACKER_LOG: 1
-          AWS_DEV_ACCOUNT: ${{secrets.AWS_DEV_ACCOUNT}}
-          AWS_DEMO_ACCOUNT: ${{secrets.AWS_DEMO_ACCOUNT}}
         run: |
           AMI_USERS_JSON="[\"$(echo ${{secrets.AMI_USERS}} | sed 's/,/\",\"/g')\"]"
           
@@ -59,24 +57,16 @@ jobs:
             -var="ami_users=$AMI_USERS_JSON" \
             .
           AMI_ID=$(aws ec2 describe-images \
-            --owners $AWS_DEV_ACCOUNT $AWS_DEMO_ACCOUNT \
+            --owners "039612889197" "156041419933" \
             --query 'sort_by(Images, &CreationDate)[-1].ImageId' \
             --output text)
           echo "AMI_ID=${AMI_ID}" >> $GITHUB_ENV
 
-      - name: Configure AWS Demo Account credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{secrets.DEMO_AWS_ACCESS_KEY_ID}}
-          aws-secret-access-key: ${{secrets.DEMO_AWS_SECRET_ACCESS_KEY}}
-          aws-region: ${{secrets.AWS_REGION}}
-
-      - name: Update Demo Infrastructure
-        env:
-          LAUNCH_TEMPLATE_NAME: "csye6225_asg_launch_template"
-          ASG_NAME: "csye6225-asg"
+      - name: Update Dev Infrastructure
         run: |
-          echo "Looking up Launch Template in Demo environment..."
+          echo "Looking up Dev Launch Template..."
+          LAUNCH_TEMPLATE_NAME="csye6225_asg_launch_template"
+          echo "Searching for template: $LAUNCH_TEMPLATE_NAME"
           
           LAUNCH_TEMPLATE_ID=$(aws ec2 describe-launch-templates \
             --filters "Name=launch-template-name,Values=$LAUNCH_TEMPLATE_NAME" \
@@ -84,7 +74,7 @@ jobs:
             --output text)
           
           if [ "$LAUNCH_TEMPLATE_ID" = "None" ] || [ -z "$LAUNCH_TEMPLATE_ID" ]; then
-            echo "Error: Failed to find launch template: $LAUNCH_TEMPLATE_NAME"
+            echo "Error: Failed to find launch template with name: $LAUNCH_TEMPLATE_NAME"
             exit 1
           fi
           echo "Found Launch Template ID: $LAUNCH_TEMPLATE_ID"
@@ -95,55 +85,52 @@ jobs:
             --output text)
           echo "Current template version: $CURRENT_VERSION"
           
-          echo "Creating new launch template version with AMI: ${{ env.AMI_ID }}"
+          echo "Creating new launch template version with AMI: ${{env.AMI_ID}}"
           NEW_VERSION=$(aws ec2 create-launch-template-version \
             --launch-template-id $LAUNCH_TEMPLATE_ID \
             --source-version $CURRENT_VERSION \
-            --launch-template-data "{\"ImageId\":\"${{ env.AMI_ID }}\"}" \
+            --launch-template-data "{\"ImageId\":\"${{env.AMI_ID}}\"}" \
             --query 'LaunchTemplateVersion.VersionNumber' \
             --output text)
           echo "Created new version: $NEW_VERSION"
           
-          echo "Verifying Demo Auto Scaling Group..."
-          ASG_CHECK=$(aws autoscaling describe-auto-scaling-groups \
-            --auto-scaling-group-names "$ASG_NAME" \
-            --query 'length(AutoScalingGroups)' \
+          echo "Looking up Dev Auto Scaling Group..."
+          ASG_NAME=$(aws autoscaling describe-auto-scaling-groups \
+            --query 'AutoScalingGroups[?contains(Tags[?Key==`Environment`].Value, `dev`)].AutoScalingGroupName' \
             --output text)
           
-          if [ "$ASG_CHECK" = "0" ]; then
-            echo "Error: Auto Scaling Group $ASG_NAME not found"
+          if [ -z "$ASG_NAME" ]; then
+            echo "Error: Failed to find Dev Auto Scaling Group"
             exit 1
           fi
+          echo "Found ASG: $ASG_NAME"
           
           echo "Updating Auto Scaling Group with new launch template version..."
           aws autoscaling update-auto-scaling-group \
-            --auto-scaling-group-name "$ASG_NAME" \
+            --auto-scaling-group-name $ASG_NAME \
             --launch-template LaunchTemplateId=$LAUNCH_TEMPLATE_ID,Version=$NEW_VERSION
           
           echo "Starting instance refresh..."
           REFRESH_ID=$(aws autoscaling start-instance-refresh \
-            --auto-scaling-group-name "$ASG_NAME" \
+            --auto-scaling-group-name $ASG_NAME \
             --preferences '{"MinHealthyPercentage": 90, "InstanceWarmup": 300}' \
             --query 'InstanceRefreshId' \
             --output text)
           
-          echo "Monitoring instance refresh..."
+          echo "Monitoring Dev instance refresh: $REFRESH_ID"
           while true; do
             STATUS=$(aws autoscaling describe-instance-refreshes \
-              --auto-scaling-group-name "$ASG_NAME" \
+              --auto-scaling-group-name $ASG_NAME \
               --instance-refresh-ids $REFRESH_ID \
               --query 'InstanceRefreshes[0].Status' \
               --output text)
             
-            echo "Instance refresh status: $STATUS"
+            echo "Dev instance refresh status: $STATUS"
             if [ "$STATUS" = "Successful" ]; then
-              echo "Instance refresh completed successfully"
               exit 0
             elif [ "$STATUS" = "Failed" ] || [ "$STATUS" = "Cancelled" ]; then
               echo "Instance refresh failed or was cancelled"
               exit 1
             fi
-            
-            echo "Waiting for refresh to complete..."
             sleep 30
           done
