@@ -62,6 +62,13 @@ jobs:
             --output text)
           echo "AMI_ID=${AMI_ID}" >> $GITHUB_ENV
 
+      - name: Configure AWS Demo credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{secrets.DEMO_AWS_ACCESS_KEY_ID}}
+          aws-secret-access-key: ${{secrets.DEMO_AWS_SECRET_ACCESS_KEY}}
+          aws-region: us-east-1
+
       - name: Update Demo Infrastructure
         run: |
           # List all launch templates to diagnose
