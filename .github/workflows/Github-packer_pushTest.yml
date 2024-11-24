@@ -47,6 +47,7 @@ jobs:
           PACKER_LOG: 1
         run: |
           AMI_USERS_JSON="[\"$(echo ${{secrets.AMI_USERS}} | sed 's/,/\",\"/g')\"]"
+          echo $AMI_USERS_JSON
           
           packer init .
           packer validate -var="aws_region=${{secrets.AWS_REGION}}" \
